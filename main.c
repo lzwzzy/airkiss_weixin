@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    system("killall wpa_supplicant");
+//    system("killall wpa_supplicant");
     wifi_if = argv[1];
 
     wireless_scan_head head;
