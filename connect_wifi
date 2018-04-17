@@ -17,11 +17,11 @@
 
 # SSID (aka. network name).
 SSID=""
-echo "ssid: $SSID"
+
 
 # Network password. (WPA-PSK/WPA2-PSK password, or WEP key)
 PASSWORD=""
-echo "pwd: $PASSWORD"
+
 
 
 while getopts "s:p" opt
@@ -36,6 +36,9 @@ do
         exit 1;;
     esac
 done
+
+echo "ssid: $SSID\n
+      pwd: $PASSWORD"
 sudo ifconfig wlan0 up
 
 # Network encryption method.
