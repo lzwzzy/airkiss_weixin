@@ -29,28 +29,31 @@
 
 static airkiss_context_t *akcontex = NULL;
 const airkiss_config_t akconf = {
-(airkiss_memset_fn)&memset,
-(airkiss_memcpy_fn)&memcpy,
-(airkiss_memcmp_fn)&memcmp,
-(airkiss_printf_fn)&printf };
+        (airkiss_memset_fn) &memset,
+        (airkiss_memcpy_fn) &memcpy,
+        (airkiss_memcmp_fn) &memcmp,
+        (airkiss_printf_fn) &printf};
 
 airkiss_result_t ak_result;
 struct itimerval my_timer;
+
 int startTimer(struct itimerval *timer, int ms);
+
 int udp_10000_broadcast_ap_connected(unsigned char random, int port,
-                                      struct sockaddr_in* broadcast_addr);
+                                     struct sockaddr_in *broadcast_addr);
 
-int udp_12476_broadcast_dev_online_req_ack(void* port_num);
-int udp_12476_broadcast_dev_online_5s_timer(void* port_fd);
+int udp_12476_broadcast_dev_online_req_ack(void *port_num);
 
-char   *wifi_if = NULL;
-struct wif *wi  = NULL;
+int udp_12476_broadcast_dev_online_5s_timer(void *port_fd);
+
+char *wifi_if = NULL;
+struct wif *wi = NULL;
 
 int g_channels[MAX_CHANNELS] = {0};
 int g_channel_index = 0;
 int g_channel_nums = 0;
 int g_dev_port_num = ONLINE_NOTIFY_PORT;
-int g_dev_port_fd  = -1;
+int g_dev_port_fd = -1;
 struct sockaddr_in g_host_addr;
 struct sockaddr_in g_netmask_addr;
 struct sockaddr_in g_broadcast_addr;
@@ -63,116 +66,108 @@ pthread_mutex_t t_lock;
 pthread_t tq_id;
 struct sched_param tq_sche_param;
 pthread_attr_t tq_attr;
-int tq_policy=0;
+int tq_policy = 0;
 // thread for 5 timer notify
 pthread_t tn_id;
 struct sched_param tn_sche_param;
 pthread_attr_t tn_attr;
-int tn_policy=0;
+int tn_policy = 0;
 
 
+int checkIFip(char *if_name, struct sockaddr_in *host_addr,
+              struct sockaddr_in *netmask_addr, struct sockaddr_in *broadcast_addr) {
+    struct ifaddrs *ifaddr, *ifa;
+    int s, ret = -1;
+    char host[NI_MAXHOST] = {0};
+    char netmask[NI_MAXHOST] = {0};
+    char broadcast[NI_MAXHOST] = {0};
 
-int checkIFip(char* if_name, struct sockaddr_in* host_addr,
-	      struct sockaddr_in* netmask_addr, struct sockaddr_in* broadcast_addr)
-{
-  struct ifaddrs *ifaddr, *ifa;
-  int s, ret = -1;
-  char host[NI_MAXHOST] = {0};
-  char netmask[NI_MAXHOST] = {0};
-  char broadcast[NI_MAXHOST] ={0};
+    if (getifaddrs(&ifaddr) == -1) {
+        LOG_TRACE("getifaddrs failed!");
+        return -1;
+    }
 
-  if (getifaddrs(&ifaddr) == -1) {
-      LOG_TRACE("getifaddrs failed!");
-      return -1;
-  }
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            LOG_TRACE("ifa_addr is NULL");
+            continue;
+        }
 
-  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-      if (ifa->ifa_addr == NULL) {
-	LOG_TRACE("ifa_addr is NULL");
-	continue;
-      }
+        s = getnameinfo(ifa->ifa_broadaddr, sizeof(struct sockaddr_in), broadcast, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+        s = getnameinfo(ifa->ifa_netmask, sizeof(struct sockaddr_in), netmask, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+        s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 
-      s = getnameinfo(ifa->ifa_broadaddr, sizeof(struct sockaddr_in), broadcast, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-      s = getnameinfo(ifa->ifa_netmask, sizeof(struct sockaddr_in), netmask, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-      s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+        if ((strcmp(ifa->ifa_name, if_name) == 0) && (ifa->ifa_addr->sa_family == AF_INET)) {
+            if (s != 0) {
+                LOG_TRACE("getnameinfo() failed: %s", gai_strerror(s));
+                break;
+            }
+            memcpy(host_addr, ifa->ifa_addr, sizeof(struct sockaddr_in));
+            memcpy(netmask_addr, ifa->ifa_netmask, sizeof(struct sockaddr_in));
+            memcpy(broadcast_addr, ifa->ifa_broadaddr, sizeof(struct sockaddr_in));
+            LOG_TRACE("\tInterface   : <%s>", ifa->ifa_name);
+            LOG_TRACE("\t  Address   : <%s>", host);
+            LOG_TRACE("\t  Netmask   : <%s>", netmask);
+            LOG_TRACE("\t  Broadcast : <%s>", broadcast);
+            ret = 0;
+            break;
+        }
+    }
 
-      if((strcmp(ifa->ifa_name, if_name)==0) && (ifa->ifa_addr->sa_family==AF_INET)) {
-	  if (s != 0) {
-	      LOG_TRACE("getnameinfo() failed: %s", gai_strerror(s));
-	      break;
-	  }
-	  memcpy(host_addr, ifa->ifa_addr, sizeof(struct sockaddr_in));
-	  memcpy(netmask_addr, ifa->ifa_netmask, sizeof(struct sockaddr_in));
-	  memcpy(broadcast_addr, ifa->ifa_broadaddr, sizeof(struct sockaddr_in));
-	  LOG_TRACE("\tInterface   : <%s>", ifa->ifa_name );
-	  LOG_TRACE("\t  Address   : <%s>", host);
-	  LOG_TRACE("\t  Netmask   : <%s>", netmask);
-	  LOG_TRACE("\t  Broadcast : <%s>", broadcast);
-          ret = 0;
-	  break;
-      }
-  }
-
-  freeifaddrs(ifaddr);
-  return ret;
+    freeifaddrs(ifaddr);
+    return ret;
 }
 
 //crc8
-unsigned char calcrc_1byte(unsigned char abyte)
-{
-    unsigned char i,crc_1byte;
-    crc_1byte=0;
-    for(i = 0; i < 8; i++) {
-        if(((crc_1byte^abyte)&0x01)) {
-            crc_1byte^=0x18;
-            crc_1byte>>=1;
-            crc_1byte|=0x80;
+unsigned char calcrc_1byte(unsigned char abyte) {
+    unsigned char i, crc_1byte;
+    crc_1byte = 0;
+    for (i = 0; i < 8; i++) {
+        if (((crc_1byte ^ abyte) & 0x01)) {
+            crc_1byte ^= 0x18;
+            crc_1byte >>= 1;
+            crc_1byte |= 0x80;
+        } else {
+            crc_1byte >>= 1;
         }
-        else {
-            crc_1byte>>=1;
-        }
-        abyte>>=1;
+        abyte >>= 1;
     }
     return crc_1byte;
 }
 
 
-unsigned char calcrc_bytes(unsigned char *p,unsigned int num_of_bytes)
-{
-    unsigned char crc=0;
-    while(num_of_bytes--) {
-        crc=calcrc_1byte(crc^*p++);
+unsigned char calcrc_bytes(unsigned char *p, unsigned int num_of_bytes) {
+    unsigned char crc = 0;
+    while (num_of_bytes--) {
+        crc = calcrc_1byte(crc ^ *p++);
     }
     return crc;
 }
 
-void switch_channel_callback(void)
-{
+void switch_channel_callback(void) {
     pthread_mutex_lock(&lock);
     g_channel_index++;
-    if(g_channel_index > g_channel_nums - 1)
-    {
+    if (g_channel_index > g_channel_nums - 1) {
         g_channel_index = 0;
         LOG_TRACE("scan all channels");
     }
-	int ret = wi->wi_set_channel(wi, g_channels[g_channel_index]);
-	if (ret) {
-		LOG_TRACE("cannot set channel to %d", g_channels[g_channel_index]);
-	}
+    int ret = wi->wi_set_channel(wi, g_channels[g_channel_index]);
+    if (ret) {
+        LOG_TRACE("cannot set channel to %d", g_channels[g_channel_index]);
+    }
 
     airkiss_change_channel(akcontex);
     pthread_mutex_unlock(&lock);
 }
 
-int fork_device_online_req_ack_thread()
-{
-    if(pthread_attr_init(&tq_attr) == 0) {
+int fork_device_online_req_ack_thread() {
+    if (pthread_attr_init(&tq_attr) == 0) {
         pthread_attr_getschedpolicy(&tq_attr, &tq_policy);
         tq_sche_param.sched_priority = sched_get_priority_min(tq_policy);
         pthread_attr_setschedparam(&tq_attr, &tq_sche_param);
-        if(pthread_create(&tq_id, &tq_attr, (void * (*)(void *))&udp_12476_broadcast_dev_online_req_ack,
-                          (void*)&g_dev_port_num) == 0) {
-            LOG_TRACE("Create device online req&ack thread:%d", (int)tq_id);
+        if (pthread_create(&tq_id, &tq_attr, (void *(*)(void *)) &udp_12476_broadcast_dev_online_req_ack,
+                           (void *) &g_dev_port_num) == 0) {
+            LOG_TRACE("Create device online req&ack thread:%d", (int) tq_id);
             pthread_detach(tq_id);
         } else {
             LOG_TRACE("Create device online req&ack thread failed!");
@@ -182,15 +177,14 @@ int fork_device_online_req_ack_thread()
     return 0;
 }
 
-int fork_device_online_5s_notify_thread()
-{
-    if(pthread_attr_init(&tn_attr) == 0) {
+int fork_device_online_5s_notify_thread() {
+    if (pthread_attr_init(&tn_attr) == 0) {
         pthread_attr_getschedpolicy(&tn_attr, &tn_policy);
         tn_sche_param.sched_priority = sched_get_priority_min(tn_policy);
         pthread_attr_setschedparam(&tn_attr, &tn_sche_param);
-        if(pthread_create(&tn_id, &tn_attr, (void * (*)(void *))&udp_12476_broadcast_dev_online_5s_timer,
-                          (void*)&g_dev_port_fd) == 0) {
-            LOG_TRACE("Create device online 5s notify thread:%d", (int)tn_id);
+        if (pthread_create(&tn_id, &tn_attr, (void *(*)(void *)) &udp_12476_broadcast_dev_online_5s_timer,
+                           (void *) &g_dev_port_fd) == 0) {
+            LOG_TRACE("Create device online 5s notify thread:%d", (int) tn_id);
             pthread_join(tn_id, NULL);
         } else {
             LOG_TRACE("Create device online 5s notify thread failed!");
@@ -200,32 +194,26 @@ int fork_device_online_5s_notify_thread()
     return 0;
 }
 
-int process_airkiss(const unsigned char *packet, int size)
-{
+int process_airkiss(const unsigned char *packet, int size) {
     char cmd_buf[256] = {0};
     pthread_mutex_lock(&lock);
     int ret;
 
-    ret = airkiss_recv(akcontex, (void *)packet, size);
-    if(ret == AIRKISS_STATUS_CONTINUE)
-    {
+    ret = airkiss_recv(akcontex, (void *) packet, size);
+    if (ret == AIRKISS_STATUS_CONTINUE) {
         // LOG_TRACE("Airkiss continue");
-    }
-    else if(ret == AIRKISS_STATUS_CHANNEL_LOCKED)
-    {
+    } else if (ret == AIRKISS_STATUS_CHANNEL_LOCKED) {
         startTimer(&my_timer, 0);
         LOG_TRACE("Lock channel in %d", g_channels[g_channel_index]);
-    }
-    else if(ret == AIRKISS_STATUS_COMPLETE)
-    {
+    } else if (ret == AIRKISS_STATUS_COMPLETE) {
         useconds_t usecs = 1 * 1000 * 1000;
         LOG_TRACE("Airkiss completed.");
         airkiss_get_result(akcontex, &ak_result);
-        LOG_TRACE("Result:\nssid_crc:[%x]\nkey_len:[%d]\nkey:[%s]\nrandom:[%d]", 
-            ak_result.reserved,
-            ak_result.pwd_length,
-            ak_result.pwd,
-            ak_result.random);
+        LOG_TRACE("Result:\nssid_crc:[%x]\nkey_len:[%d]\nkey:[%s]\nrandom:[%d]",
+                  ak_result.reserved,
+                  ak_result.pwd_length,
+                  ak_result.pwd,
+                  ak_result.random);
 
         // scan and connect to wifi
 //        system("sudo rm -rf /etc/wpa_supplicant/wpa_supplicant.conf");
@@ -234,38 +222,35 @@ int process_airkiss(const unsigned char *packet, int size)
 //        memset(cmd_buf, 0, 256);
 //        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
 //        system(cmd_buf);
-        system("sudo ifconfig wlan0mon down");
 
-        usleep(usecs);
         system("sudo ifconfig wlan0 up");
-//        FILE *fstream = NULL;
-//        char buff[1024];
-//        memset(buff, 0, sizeof(buff));
-//        char str[80];
-//        strcpy(str, "sudo bash connect_wifi ");
-//        strcat(str, ak_result.ssid);
-//        strcat(str, " ");
-//        strcat(str, ak_result.pwd);
-//        const char *shell = str;
-//        if (NULL == (fstream = popen(shell, "r"))) {
-//            fprintf(stderr, "execute command failed: %s", strerror(errno));
-//            return 1;
-//        }
-//
-//        while (NULL != fgets(buff, sizeof(buff), fstream)) {
-//
-//            printf("%s", buff);
-//
-//        }
-//        pclose(fstream);
+        FILE *fstream = NULL;
+        char buff[1024];
+        memset(buff, 0, sizeof(buff));
+        char str[80];
+        strcpy(str, "sudo bash connect_wifi ");
+        strcat(str, ak_result.ssid);
+        strcat(str, " ");
+        strcat(str, ak_result.pwd);
+        const char *shell = str;
+        if (NULL == (fstream = popen(shell, "r"))) {
+            fprintf(stderr, "execute command failed: %s", strerror(errno));
+            return 1;
+        }
 
+        while (NULL != fgets(buff, sizeof(buff), fstream)) {
+
+            printf("%s", buff);
+
+        }
+        pclose(fstream);
 
 
         usleep(usecs);
-        do{
+        do {
             sleep(1);
-        } while(checkIFip("wlan0", &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
-	udp_10000_broadcast_ap_connected(ak_result.random, RANDOM_ACK_PORT, &g_broadcast_addr);
+        } while (checkIFip("wlan0", &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
+        udp_10000_broadcast_ap_connected(ak_result.random, RANDOM_ACK_PORT, &g_broadcast_addr);
     }
     pthread_mutex_unlock(&lock);
 
@@ -274,31 +259,28 @@ int process_airkiss(const unsigned char *packet, int size)
 
 void add_channel(int chan) {
     int i;
-    for(i=0; i<g_channel_nums; i++) {
-        if(g_channels[i]==chan)
+    for (i = 0; i < g_channel_nums; i++) {
+        if (g_channels[i] == chan)
             break;
     }
-    if(i==g_channel_nums) {
+    if (i == g_channel_nums) {
         g_channel_nums += 1;
         g_channels[i] = chan;
     }
 }
 
-void init_channels()
-{
+void init_channels() {
     int i;
-    for(i=1; i<MAX_CHANNELS; i++)
-    {
+    for (i = 1; i < MAX_CHANNELS; i++) {
         add_channel(i);
     }
 }
 
 
-int startTimer(struct itimerval *timer, int ms)
-{
+int startTimer(struct itimerval *timer, int ms) {
     time_t secs, usecs;
-    secs = ms/1000;
-    usecs = ms%1000 * 1000;
+    secs = ms / 1000;
+    usecs = ms % 1000 * 1000;
 
     timer->it_interval.tv_sec = secs;
     timer->it_interval.tv_usec = usecs;
@@ -309,8 +291,7 @@ int startTimer(struct itimerval *timer, int ms)
     return 0;
 }
 
-int udp_10000_broadcast_ap_connected(unsigned char random, int port, struct sockaddr_in* broadcast_addr)
-{
+int udp_10000_broadcast_ap_connected(unsigned char random, int port, struct sockaddr_in *broadcast_addr) {
     int fd, status, sinlen;
     int enabled = 1;
     struct sockaddr_in addr;
@@ -323,7 +304,7 @@ int udp_10000_broadcast_ap_connected(unsigned char random, int port, struct sock
     addr.sin_port = htons(0);
     addr.sin_family = PF_INET;
 
-    status = bind(fd, (struct sockaddr *)&addr, sinlen);
+    status = bind(fd, (struct sockaddr *) &addr, sinlen);
     // LOG_TRACE("Bind Status = %d", status);
 
     status = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(int));
@@ -336,10 +317,9 @@ int udp_10000_broadcast_ap_connected(unsigned char random, int port, struct sock
     //addr.sin_family = PF_INET;
 
     int i;
-    useconds_t usecs = 1000*20;
-    for(i=0; i<20; i++)
-    {
-        status = sendto(fd, &random, 1, 0, (struct sockaddr*)&addr, sizeof(struct sockaddr));
+    useconds_t usecs = 1000 * 20;
+    for (i = 0; i < 30; i++) {
+        status = sendto(fd, &random, 1, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr));
         usleep(usecs);
     }
     LOG_TRACE("send 20 received random data(%d) to WeChat, result = %d", random, status);
@@ -349,15 +329,14 @@ int udp_10000_broadcast_ap_connected(unsigned char random, int port, struct sock
     return 0;
 }
 
-int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
-{
+int udp_12476_broadcast_dev_online_req_ack(void *pt_num) {
     int fd, status;
     size_t addr_len;
-    int port = *((int*)pt_num);
+    int port = *((int *) pt_num);
     struct sockaddr_in addr_in, addr_out;
-    uint8_t  lan_buf_in[200] = {0};
+    uint8_t lan_buf_in[200] = {0};
     uint16_t lan_buf_in_len = 0;
-    uint8_t  lan_buf[200] = {0};
+    uint8_t lan_buf[200] = {0};
     uint16_t lan_buf_len = 0;
     airkiss_lan_ret_t packret;
     char dst_ip[NI_MAXHOST] = {0};
@@ -366,7 +345,7 @@ int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
 
     pthread_mutex_lock(&t_lock);
     addr_len = sizeof(struct sockaddr_in);
-    memset(&addr_in,  0, addr_len);
+    memset(&addr_in, 0, addr_len);
     memset(&addr_out, 0, addr_len);
     g_dev_port_fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
     fd = g_dev_port_fd;
@@ -374,20 +353,20 @@ int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
     addr_in.sin_port = htons(port);
     addr_in.sin_family = PF_INET;
 
-    status = bind(fd, (struct sockaddr *)&addr_in, addr_len);
+    status = bind(fd, (struct sockaddr *) &addr_in, addr_len);
     LOG_TRACE("req&ack thread bind Status = %d, port = %d, fd = %d", status, port, fd);
     //pthread_mutex_unlock(&t_lock);
 
-    while(1) {
+    while (1) {
         //pthread_mutex_lock(&t_lock);
         is_exit = 0;
         memset(lan_buf_in, 0, 200);
-        lan_buf_in_len = recvfrom(fd, lan_buf_in, 200, 0, (struct sockaddr *)&addr_out, &addr_len);
+        lan_buf_in_len = recvfrom(fd, lan_buf_in, 200, 0, (struct sockaddr *) &addr_out, &addr_len);
         getnameinfo(&addr_out, sizeof(struct sockaddr_in), dst_ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
         addr_out.sin_family = PF_INET;
-        if(lan_buf_in_len != -1) {
+        if (lan_buf_in_len != -1) {
             packret = airkiss_lan_recv(lan_buf_in, lan_buf_in_len, &akconf);
-            switch (packret){
+            switch (packret) {
                 case AIRKISS_LAN_SSDP_REQ:
                     memset(lan_buf, 0, 200);
                     lan_buf_len = sizeof(lan_buf);
@@ -395,13 +374,14 @@ int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
                                                lan_buf, &lan_buf_len, &akconf);
                     if (packret != AIRKISS_LAN_PAKE_READY) {
                         LOG_TRACE("req&ack thread airkiss pack lan packet error, ret = %d", packret);
-                    }
-                    else {
-                        for(i=0; i<10; i++) {
-                            status = sendto(fd, lan_buf, lan_buf_len, 0, (struct sockaddr*)&addr_out, sizeof(struct sockaddr));
-                            LOG_TRACE("Reply AIRKISS_LAN_SSDP_REQ respone to WeChat(%s:%d), len = %d", dst_ip, ntohs(addr_out.sin_port), status);
+                    } else {
+                        for (i = 0; i < 10; i++) {
+                            status = sendto(fd, lan_buf, lan_buf_len, 0, (struct sockaddr *) &addr_out,
+                                            sizeof(struct sockaddr));
+                            LOG_TRACE("Reply AIRKISS_LAN_SSDP_REQ respone to WeChat(%s:%d), len = %d", dst_ip,
+                                      ntohs(addr_out.sin_port), status);
                         }
-			is_exit = 1;
+                        is_exit = 1;
 /*
                         for(i=0; i<20; i++) {
                            LOG_TRACE("%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",
@@ -418,9 +398,9 @@ int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
             }
         }
 
-	if(is_exit == 1) {
-	    pthread_mutex_unlock(&t_lock);
-	    break;
+        if (is_exit == 1) {
+            pthread_mutex_unlock(&t_lock);
+            break;
         }
     }
 
@@ -429,19 +409,18 @@ int udp_12476_broadcast_dev_online_req_ack(void* pt_num)
     return 0;
 }
 
-int udp_12476_broadcast_dev_online_5s_timer(void* pt_fd)
-{
+int udp_12476_broadcast_dev_online_5s_timer(void *pt_fd) {
     int status;
     int enabled = 1;
-    int fd = *((int*)pt_fd);
+    int fd = *((int *) pt_fd);
     struct sockaddr_in addr;
-    uint8_t  lan_buf[200] = {0};
+    uint8_t lan_buf[200] = {0};
     uint16_t lan_buf_len;
     airkiss_lan_ret_t packret;
     char dst_ip[NI_MAXHOST] = {0};
 //    int i = 0;
 
-    if(fd == -1) {
+    if (fd == -1) {
         LOG_TRACE("device local socket fd is -1!");
         return -1;
     }
@@ -453,21 +432,22 @@ int udp_12476_broadcast_dev_online_5s_timer(void* pt_fd)
     addr.sin_port = htons(ONLINE_NOTIFY_PORT); /* port number */
     addr.sin_family = PF_INET;
 
-    while(1) {
+    while (1) {
         pthread_mutex_lock(&t_lock);
-        memset(lan_buf, 0 , 200);
-	lan_buf_len = sizeof(lan_buf);
-	packret = airkiss_lan_pack(AIRKISS_LAN_SSDP_NOTIFY_CMD, DEVICE_TYPE, DEVICE_ID, 0, 0, lan_buf, &lan_buf_len, &akconf);
-	if (packret != AIRKISS_LAN_PAKE_READY) {
-	    LOG_TRACE("5s timer thread airkiss Pack lan packet error, ret = %d!", packret);
-	}
-	else {
-            enabled =1;
-	    status = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(int));
-	    //	    LOG_TRACE("5s timer thread Setsockopt fd = %d, enabled = %d, Status = %d", fd, enabled, status);
+        memset(lan_buf, 0, 200);
+        lan_buf_len = sizeof(lan_buf);
+        packret = airkiss_lan_pack(AIRKISS_LAN_SSDP_NOTIFY_CMD, DEVICE_TYPE, DEVICE_ID, 0, 0, lan_buf, &lan_buf_len,
+                                   &akconf);
+        if (packret != AIRKISS_LAN_PAKE_READY) {
+            LOG_TRACE("5s timer thread airkiss Pack lan packet error, ret = %d!", packret);
+        } else {
+            enabled = 1;
+            status = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(int));
+            //	    LOG_TRACE("5s timer thread Setsockopt fd = %d, enabled = %d, Status = %d", fd, enabled, status);
             getnameinfo(&addr, sizeof(struct sockaddr_in), dst_ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-	    status = sendto(fd, lan_buf, lan_buf_len, 0, (struct sockaddr*)&addr, sizeof(struct sockaddr));
-            LOG_TRACE("Send AIRKISS_LAN_SSDP_NOTIFY_CMD command to WeChat(%s:%d), len = %d", dst_ip, ntohs(addr.sin_port), status);
+            status = sendto(fd, lan_buf, lan_buf_len, 0, (struct sockaddr *) &addr, sizeof(struct sockaddr));
+            LOG_TRACE("Send AIRKISS_LAN_SSDP_NOTIFY_CMD command to WeChat(%s:%d), len = %d", dst_ip,
+                      ntohs(addr.sin_port), status);
 /*
             for(i=0; i<20; i++) {
                 LOG_TRACE("%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d",
@@ -477,10 +457,10 @@ int udp_12476_broadcast_dev_online_5s_timer(void* pt_fd)
                 lan_buf[i*10+15], lan_buf[i*10+16], lan_buf[i*10+17], lan_buf[i*10+18], lan_buf[i*10+19]);
             }
 */
-	    enabled = 0;
+            enabled = 0;
             status = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(int));
-	    //	    LOG_TRACE("5s timer thread Setsockopt fd = %d, enabled = %d, Status = %d", fd, enabled, status);
-	}
+            //	    LOG_TRACE("5s timer thread Setsockopt fd = %d, enabled = %d, Status = %d", fd, enabled, status);
+        }
         pthread_mutex_unlock(&t_lock);
         sleep(5);
     }
@@ -490,10 +470,8 @@ int udp_12476_broadcast_dev_online_5s_timer(void* pt_fd)
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
-    if(argc!=2)
-    {
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
         LOG_ERROR("Usage: %s <device-name>", argv[0]);
         return 1;
     }
@@ -504,15 +482,14 @@ int main(int argc, char *argv[])
     wireless_scan_head head;
     wireless_scan *presult = NULL;
     LOG_TRACE("Scanning accesss point...");
-    if(wifi_scan(wifi_if, &head) == 0)
-    {
+    if (wifi_scan(wifi_if, &head) == 0) {
         LOG_TRACE("Scan success.");
         presult = head.result;
-        while(presult != NULL) {
+        while (presult != NULL) {
             char essid[MAX_ESSID_SIZE];
             char bssid[MAX_BSSID_SIZE];
             unsigned int freq;
-            int channel,power;
+            int channel, power;
             unsigned char essid_crc;
 
             get_essid(presult, essid, MAX_ESSID_SIZE);
@@ -521,16 +498,14 @@ int main(int argc, char *argv[])
             power = get_strength_dbm(presult);
 
             channel = getChannelFromFrequency(freq);
-            essid_crc = calcrc_bytes((unsigned char*)essid, strlen(essid));
+            essid_crc = calcrc_bytes((unsigned char *) essid, strlen(essid));
 
             LOG_TRACE("bssid:[%s], channel:[%2d], pow:[%d dBm], essid_crc:[%02x], essid:[%s]",
-                    bssid, channel, power, essid_crc, essid);
+                      bssid, channel, power, essid_crc, essid);
             add_channel(channel);
             presult = presult->next;
         }
-    }
-    else
-    {
+    } else {
         LOG_ERROR("ERROR to scan AP, init with all %d channels", MAX_CHANNELS);
         init_channels();
     }
@@ -538,50 +513,48 @@ int main(int argc, char *argv[])
     /* Open the interface and set mode monitor */
     wi = wi_open(wifi_if);
     if (!wi) {
-	LOG_ERROR("cannot init interface %s", wifi_if);
-	return 1;
+        LOG_ERROR("cannot init interface %s", wifi_if);
+        return 1;
     }
 
     /* airkiss setup */
     int result;
-    akcontex = (airkiss_context_t *)malloc(sizeof(airkiss_context_t));
+    akcontex = (airkiss_context_t *) malloc(sizeof(airkiss_context_t));
     result = airkiss_init(akcontex, &akconf);
-    if(result != 0)
-    {
+    if (result != 0) {
         LOG_ERROR("Airkiss init failed!!");
         return 1;
     }
     LOG_TRACE("Airkiss version: %s", airkiss_version());
-    if(pthread_mutex_init(&lock, NULL) != 0)
-    {
+    if (pthread_mutex_init(&lock, NULL) != 0) {
         LOG_ERROR("mutex init failed");
         return 1;
     }
 
     /* Setup channel switch timer */
     startTimer(&my_timer, 400);
-    signal(SIGALRM,(__sighandler_t)&switch_channel_callback);
+    signal(SIGALRM, (__sighandler_t) & switch_channel_callback);
 
     int read_size;
     unsigned char buf[RECV_BUFSIZE] = {0};
-    for(;;)
-    {
-	read_size = wi->wi_read(wi, buf, RECV_BUFSIZE, NULL);
-	if (read_size < 0) {
+    for (;;) {
+        read_size = wi->wi_read(wi, buf, RECV_BUFSIZE, NULL);
+        if (read_size < 0) {
             LOG_ERROR("recv failed, ret %d", read_size);
             break;
-	}
-        if(AIRKISS_STATUS_COMPLETE==process_airkiss(buf, read_size)) {
-            // break;
-	    if(pthread_mutex_init(&t_lock, NULL) != 0) {
-	        LOG_ERROR("init t_lock failed!");
-	    }
-	    else {
+        }
+        if (AIRKISS_STATUS_COMPLETE == process_airkiss(buf, read_size)) {
+            break;
+            /**
+            if (pthread_mutex_init(&t_lock, NULL) != 0) {
+                LOG_ERROR("init t_lock failed!");
+            } else {
                 fork_device_online_req_ack_thread();
                 fork_device_online_5s_notify_thread();
-	    }
-	}
-     }
+            }
+            **/
+        }
+    }
 
     free(akcontex);
     pthread_mutex_destroy(&lock);
