@@ -71,6 +71,29 @@ pthread_attr_t tn_attr;
 int tn_policy=0;
 
 
+char * num2hex(uint num)
+{
+    int i;
+    uint tmp;
+
+    uint mask = 0xf;            //掩码0x 0000 000f
+
+    static char hex[MAX_SIZE];  //存储十六进制字符串
+
+    hex[0] = '0';               //前两位固定不变，为0x
+    hex[1] = 'x';
+
+    //为其余元素赋值
+    for(i = 9; i >= 2; i--)
+    {
+        tmp = num & mask;
+        hex[i] = (tmp >= 10) ? ((tmp - 10)  + 'a') : (tmp + '0');
+        num  = num >> 4;
+    }
+
+    return hex;
+}
+
 int checkIFip(char* if_name, struct sockaddr_in* host_addr,
 	      struct sockaddr_in* netmask_addr, struct sockaddr_in* broadcast_addr)
 {
@@ -230,11 +253,11 @@ int process_airkiss(const unsigned char *packet, int size)
         sprintf(cmd_buf, "wpa_passphrase %s %s > /etc/wpa_supplicant/wpa_supplicant.conf", ak_result.ssid, ak_result.pwd);
         system(cmd_buf);
         memset(cmd_buf, 0, 256);
-        sprintf(cmd_buf, "wpa_supplicant -i %s -c /etc/wpa_supplicant/wpa_supplicant.conf -B", wifi_if);
+        sprintf(cmd_buf, "wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
         system(cmd_buf);
         do{
             sleep(1);
-        } while(checkIFip(wifi_if, &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
+        } while(checkIFip("wlan0", &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
 	udp_10000_broadcast_ap_connected(ak_result.random, RANDOM_ACK_PORT, &g_broadcast_addr);
     }
     pthread_mutex_unlock(&lock);
