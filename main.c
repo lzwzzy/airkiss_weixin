@@ -227,12 +227,36 @@ int process_airkiss(const unsigned char *packet, int size)
             ak_result.random);
 
         // scan and connect to wifi
-        system("sudo rm -rf /etc/wpa_supplicant/wpa_supplicant.conf");
-        sprintf(cmd_buf, "sudo wpa_passphrase %s %s > /etc/wpa_supplicant/wpa_supplicant.conf", ak_result.ssid, ak_result.pwd);
-        system(cmd_buf);
-        memset(cmd_buf, 0, 256);
-        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
-        system(cmd_buf);
+//        system("sudo rm -rf /etc/wpa_supplicant/wpa_supplicant.conf");
+//        sprintf(cmd_buf, "sudo wpa_passphrase %s %s > /etc/wpa_supplicant/wpa_supplicant.conf", ak_result.ssid, ak_result.pwd);
+//        system(cmd_buf);
+//        memset(cmd_buf, 0, 256);
+//        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
+//        system(cmd_buf);
+        FILE *fstream = NULL;
+        char buff[1024];
+        memset(buff, 0, sizeof(buff));
+        char str[80];
+        strcpy(str, "sudo bash connect_wifi ");
+        strcat(str, ak_result.ssid);
+        strcat(str, " ");
+        strcat(str, ak_result.pwd);
+        const char *shell = str;
+        if (NULL == (fstream = popen(shell, "r"))) {
+            fprintf(stderr, "execute command failed: %s", strerror(errno));
+            return 1;
+        }
+
+        while (NULL != fgets(buff, sizeof(buff), fstream)) {
+
+            printf("%s", buff);
+
+        }
+        pclose(fstream);
+
+        useconds_t usecs = 1 * 1000 * 1000;
+
+        usleep(usecs);
         do{
             sleep(1);
         } while(checkIFip("wlan0", &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
