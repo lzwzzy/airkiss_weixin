@@ -233,26 +233,27 @@ int process_airkiss(const unsigned char *packet, int size)
 //        memset(cmd_buf, 0, 256);
 //        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
 //        system(cmd_buf);
-        FILE *fstream = NULL;
-        char buff[1024];
-        memset(buff, 0, sizeof(buff));
-        char str[80];
-        strcpy(str, "sudo bash connect_wifi ");
-        strcat(str, ak_result.ssid);
-        strcat(str, " ");
-        strcat(str, ak_result.pwd);
-        const char *shell = str;
-        if (NULL == (fstream = popen(shell, "r"))) {
-            fprintf(stderr, "execute command failed: %s", strerror(errno));
-            return 1;
-        }
-
-        while (NULL != fgets(buff, sizeof(buff), fstream)) {
-
-            printf("%s", buff);
-
-        }
-        pclose(fstream);
+        system("sudo ifconfig wlan0 up");
+//        FILE *fstream = NULL;
+//        char buff[1024];
+//        memset(buff, 0, sizeof(buff));
+//        char str[80];
+//        strcpy(str, "sudo bash connect_wifi ");
+//        strcat(str, ak_result.ssid);
+//        strcat(str, " ");
+//        strcat(str, ak_result.pwd);
+//        const char *shell = str;
+//        if (NULL == (fstream = popen(shell, "r"))) {
+//            fprintf(stderr, "execute command failed: %s", strerror(errno));
+//            return 1;
+//        }
+//
+//        while (NULL != fgets(buff, sizeof(buff), fstream)) {
+//
+//            printf("%s", buff);
+//
+//        }
+//        pclose(fstream);
 
         useconds_t usecs = 1 * 1000 * 1000;
 
