@@ -227,11 +227,11 @@ int process_airkiss(const unsigned char *packet, int size)
             ak_result.random);
 
         // scan and connect to wifi
-        system("rm -rf /etc/wpa_supplicant/wpa_supplicant.conf");
-        sprintf(cmd_buf, "wpa_passphrase %s %s > /etc/wpa_supplicant/wpa_supplicant.conf", ak_result.ssid, ak_result.pwd);
+        system("sudo rm -rf /etc/wpa_supplicant/wpa_supplicant.conf");
+        sprintf(cmd_buf, "sudo wpa_passphrase %s %s > /etc/wpa_supplicant/wpa_supplicant.conf", ak_result.ssid, ak_result.pwd);
         system(cmd_buf);
         memset(cmd_buf, 0, 256);
-        sprintf(cmd_buf, "wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
+        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
         system(cmd_buf);
         do{
             sleep(1);
