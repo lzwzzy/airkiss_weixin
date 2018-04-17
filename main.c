@@ -218,6 +218,7 @@ int process_airkiss(const unsigned char *packet, int size)
     }
     else if(ret == AIRKISS_STATUS_COMPLETE)
     {
+        useconds_t usecs = 1 * 1000 * 1000;
         LOG_TRACE("Airkiss completed.");
         airkiss_get_result(akcontex, &ak_result);
         LOG_TRACE("Result:\nssid_crc:[%x]\nkey_len:[%d]\nkey:[%s]\nrandom:[%d]", 
@@ -233,6 +234,9 @@ int process_airkiss(const unsigned char *packet, int size)
 //        memset(cmd_buf, 0, 256);
 //        sprintf(cmd_buf, "sudo wpa_supplicant -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf -B");
 //        system(cmd_buf);
+        system("sudo ifconfig wlan0mon down");
+
+        usleep(usecs);
         system("sudo ifconfig wlan0 up");
 //        FILE *fstream = NULL;
 //        char buff[1024];
@@ -255,7 +259,7 @@ int process_airkiss(const unsigned char *packet, int size)
 //        }
 //        pclose(fstream);
 
-        useconds_t usecs = 1 * 1000 * 1000;
+
 
         usleep(usecs);
         do{
