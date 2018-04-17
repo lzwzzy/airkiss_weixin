@@ -71,28 +71,6 @@ pthread_attr_t tn_attr;
 int tn_policy=0;
 
 
-char * num2hex(uint num)
-{
-    int i;
-    uint tmp;
-
-    uint mask = 0xf;            //掩码0x 0000 000f
-
-    static char hex[MAX_SIZE];  //存储十六进制字符串
-
-    hex[0] = '0';               //前两位固定不变，为0x
-    hex[1] = 'x';
-
-    //为其余元素赋值
-    for(i = 9; i >= 2; i--)
-    {
-        tmp = num & mask;
-        hex[i] = (tmp >= 10) ? ((tmp - 10)  + 'a') : (tmp + '0');
-        num  = num >> 4;
-    }
-
-    return hex;
-}
 
 int checkIFip(char* if_name, struct sockaddr_in* host_addr,
 	      struct sockaddr_in* netmask_addr, struct sockaddr_in* broadcast_addr)
