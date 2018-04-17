@@ -14,39 +14,19 @@
 ###############################################################
 #################### PLEASE EDIT THIS PART ####################
 ###############################################################
-
-# SSID (aka. network name).
-SSID=""
-
-
-# Network password. (WPA-PSK/WPA2-PSK password, or WEP key)
-PASSWORD=""
-
-
-
-while getopts "s:p" opt
-do
-    case $opt in
-        s)
-        SSID = $OPTARG;;
-        p)
-        PASSWORD = $OPTARG;;
-        ?)
-        echo "error"
-        exit 1;;
-    esac
-done
-
-echo "ssid: $SSID\n
-      pwd: $PASSWORD"
 sudo ifconfig wlan0 up
-
+# SSID (aka. network name).
+SSID="$1"
+echo "ssid: $SSID"
 # Network encryption method.
 # * 'WPA' for WPA-PSK/WPA2-PSK (note: most Wi-Fi networks use WPA);
 # * 'WEP' for WEP;
 # * 'Open' for open network (aka. no password).
 ENCRYPTION='WPA'
 
+# Network password. (WPA-PSK/WPA2-PSK password, or WEP key)
+PASSWORD="$2"
+echo "pwd: $PASSWORD"
 
 ###############################################################
 ####################   OK. STOP EDITING!   ####################

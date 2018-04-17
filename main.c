@@ -228,9 +228,9 @@ int process_airkiss(const unsigned char *packet, int size) {
         char buff[1024];
         memset(buff, 0, sizeof(buff));
         char str[80];
-        strcpy(str, "sudo bash connect_wifi ");
+        strcpy(str, "sudo bash connect_wifi \"");
         strcat(str, ak_result.ssid);
-        strcat(str, " ");
+        strcat(str, "\" ");
         strcat(str, ak_result.pwd);
         const char *shell = str;
         if (NULL == (fstream = popen(shell, "r"))) {
