@@ -27,10 +27,10 @@ PASSWORD=""
 while getopts "s:p" opt
 do
     case $opt in
-        a)
+        s)
         SSID = $OPTARG;;
-        b)
-       PASSWORD = $OPTARG;;
+        p)
+        PASSWORD = $OPTARG;;
         ?)
         echo "error"
         exit 1;;
