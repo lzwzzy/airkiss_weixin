@@ -24,8 +24,8 @@
 #define RANDOM_ACK_PORT (10000)
 #define ONLINE_NOTIFY_PORT (12476)
 
-#define DEVICE_TYPE   "gh_a88096b14315"
-#define DEVICE_ID     "gh_a88096b14315_e5604bc883bf7eb1"
+#define DEVICE_TYPE   "gh_9de846f2540a"
+#define DEVICE_ID     "gh_9de846f2540a_37bc6d467af32506"
 
 static airkiss_context_t *akcontex = NULL;
 const airkiss_config_t akconf = {
