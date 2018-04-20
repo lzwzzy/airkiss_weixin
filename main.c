@@ -544,15 +544,13 @@ int main(int argc, char *argv[]) {
             break;
         }
         if (AIRKISS_STATUS_COMPLETE == process_airkiss(buf, read_size)) {
-            break;
-            /**
             if (pthread_mutex_init(&t_lock, NULL) != 0) {
                 LOG_ERROR("init t_lock failed!");
             } else {
                 fork_device_online_req_ack_thread();
                 fork_device_online_5s_notify_thread();
             }
-            **/
+
         }
     }
 
