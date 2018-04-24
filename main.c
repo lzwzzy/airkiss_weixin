@@ -206,7 +206,6 @@ int process_airkiss(const unsigned char *packet, int size) {
         startTimer(&my_timer, 0);
         LOG_TRACE("Lock channel in %d", g_channels[g_channel_index]);
     } else if (ret == AIRKISS_STATUS_COMPLETE) {
-        useconds_t usecs = 1 * 1000 * 1000;
         LOG_TRACE("Airkiss completed.");
         airkiss_get_result(akcontex, &ak_result);
         LOG_TRACE("Result:\nssid_crc:[%x]\nkey_len:[%d]\nkey:[%s]\nrandom:[%d]",
@@ -244,9 +243,6 @@ int process_airkiss(const unsigned char *packet, int size) {
 
         }
         pclose(fstream);
-
-
-        usleep(usecs);
         do {
             sleep(1);
         } while (checkIFip("wlan0", &g_host_addr, &g_netmask_addr, &g_broadcast_addr) == -1);
