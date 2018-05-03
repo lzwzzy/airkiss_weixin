@@ -474,10 +474,9 @@ int udp_12476_broadcast_dev_online_5s_timer(void *pt_fd)
     //memcpy(&addr, &g_broadcast_addr, sizeof(struct sockaddr_in));
     //addr.sin_addr.s_addr=htonl(INADDR_BROADCAST); /* send message to 255.255.255.255*/
     //addr.sin_addr.s_addr=htonl(-1);
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = inet_addr(g_broadcast_addr);
     addr.sin_port = htons(ONLINE_NOTIFY_PORT); /* port number */
     addr.sin_family = PF_INET;
-    memcpy(&addr, &g_broadcast_addr, sizeof(struct sockaddr_in));
     while (1)
     {
         pthread_mutex_lock(&t_lock);
